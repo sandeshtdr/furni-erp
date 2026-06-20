@@ -13,7 +13,7 @@ export default function MOPage() {
   const [mos, setMos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ client_name: '', project_type: 'Kitchen modular', delivery_date: '', notes: '' });
+  const [form, setForm] = useState({ client_name: '', project_type: 'Commercial', delivery_date: '', notes: '' });
   const [saving, setSaving] = useState(false);
 
   async function load() {
@@ -33,7 +33,7 @@ export default function MOPage() {
     await fetch('/api/mo', { method: 'POST', body: JSON.stringify(form) });
     setSaving(false);
     setOpen(false);
-    setForm({ client_name: '', project_type: 'Kitchen modular', delivery_date: '', notes: '' });
+    setForm({ client_name: '', project_type: 'Commercial', delivery_date: '', notes: '' });
     load();
   }
 
@@ -117,13 +117,12 @@ export default function MOPage() {
           </Field>
         </FormRow>
         <FormRow>
-          <Field label="Project type">
-            <Select value={form.project_type} onChange={(e) => setForm({ ...form, project_type: e.target.value })}>
-              <option>Kitchen modular</option>
-              <option>Wardrobe</option>
-              <option>Office furniture</option>
-            </Select>
-          </Field>
+        <Field label="Project type">
+  <Select value={form.project_type} onChange={(e) => setForm({ ...form, project_type: e.target.value })}>
+    <option>Commercial</option>
+    <option>Residential</option>
+  </Select>
+</Field>
           <div />
         </FormRow>
         <Field label="Notes">
