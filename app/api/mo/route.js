@@ -15,14 +15,29 @@ export async function GET() {
 export async function POST(req) {
   const body = await req.json();
 
-  // Determine next sequence number for MO + Project ID
+  // Determine next sequence number for Project ID (still purely sequential)
   const { count } = await supabase
     .from('manufacturing_orders')
     .select('*', { count: 'exact', head: true });
 
   const seq = (count || 0) + 1 + 41; // demo data starts at 042; remove +41 once demo seed is cleared
-  const mo_number = `MO-2024-${String(seq).padStart(3, '0')}`;
   const project_id = genProjectId(seq);
+
+  // Build MO number from client name: MO-<first 5 letters, uppercase, letters only>-<suffix>
+  const clientLetters = (body.client_name || '')
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '')
+    .slice(0, 5)
+    .padEnd(5, 'X'); // pad short names (e.g. "Abc" -> "ABCXX") so the format stays consistent
+
+  // Count existing MOs for this same client prefix to pick the next suffix
+  const { count: clientCount } = await supabase
+    .from('manufacturing_orders')
+    .select('*', { count: 'exact', head: true })
+    .ilike('mo_number', `MO-${clientLetters}-%`);
+
+  const suffix = String((clientCount || 0) + 1).padStart(2, '0');
+  const mo_number = `MO-${clientLetters}-${suffix}`;
 
   const { data, error } = await supabase
     .from('manufacturing_orders')
@@ -44,6 +59,28 @@ export async function POST(req) {
     event_type: 'mo_created',
     description: `${mo_number} created — Project ID ${project_id} assigned (${body.client_name})`,
   });
+
+  // Auto-create blank Job Cards based on num_products
+  const numProducts = parseInt(body.num_products, 10) || 0;
+  if (numProducts > 0) {
+    const newJcs = Array.from({ length: numProducts }, (_, i) => ({
+      jc_number: `${project_id}-JC${String(i + 1).padStart(2, '0')}`,
+      mo_id: data.id,
+      project_id,
+      product_name: `Product ${i + 1} (pending details)`,
+      stage: 'JC Created',
+      status: 'Active',
+    }));
+
+    const { error: jcError } = await supabase.from('job_cards').insert(newJcs);
+
+    if (!jcError) {
+      await supabase.from('activity_log').insert({
+        event_type: 'jc_created',
+        description: `${numProducts} Job Card${numProducts > 1 ? 's' : ''} auto-created for ${project_id} (${mo_number})`,
+      });
+    }
+  }
 
   return NextResponse.json(data);
 }
