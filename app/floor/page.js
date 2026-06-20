@@ -118,7 +118,8 @@ export default function FloorPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-4">
         {stations.map((s) => {
           const Icon = STATION_ICONS[s.name] || Flame;
-          const busy = s.status === 'Busy' || !!s.job_cards?.jc_number;
+          const jcsAtStation = jcs.filter((j) => j.stage === s.name);
+          const busy = jcsAtStation.length > 0;
           return (
             <div key={s.id} className={`bg-white border rounded-xl p-3 ${busy ? 'border-amber-200' : 'border-slate-200'}`}>
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-2 ${busy ? 'bg-amber-50' : 'bg-slate-100'}`}>
@@ -126,7 +127,20 @@ export default function FloorPage() {
               </div>
               <div className="text-[12px] font-medium">{s.name}</div>
               <div className="text-[10px] text-slate-500 mb-1.5">{s.owner_name}</div>
-              {busy ? <Badge status="Busy">{s.job_cards?.jc_number || 'Busy'}</Badge> : <Badge status="Idle">Idle</Badge>}
+              {busy ? (
+                <div className="flex flex-col gap-1">
+                  {jcsAtStation.map((j) => (
+                    <Badge key={j.id} status="Busy">
+                      {j.jc_number}
+                    </Badge>
+                  ))}
+                  {jcsAtStation.length > 1 && (
+                    <span className="text-[10px] text-slate-400 mt-0.5">{jcsAtStation.length} JCs queued</span>
+                  )}
+                </div>
+              ) : (
+                <Badge status="Idle">Idle</Badge>
+              )}
             </div>
           );
         })}

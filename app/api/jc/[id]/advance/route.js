@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../../lib/supabaseClient';
-import { nextStage } from '../../../../../lib/constants';
+import { nextStage, STATION_SEQUENCE } from '../../../../../lib/constants';
 
 // PATCH /api/jc/[id]/advance
 export async function PATCH(req, { params }) {
@@ -30,6 +30,26 @@ export async function PATCH(req, { params }) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Sync the stations table: free up the station this JC is leaving,
+  // and mark the station it's entering (if any) as Busy with this JC.
+  const wasAtStation = STATION_SEQUENCE.includes(jc.stage);
+  const nowAtStation = STATION_SEQUENCE.includes(newStage);
+
+  if (wasAtStation) {
+    await supabase
+      .from('stations')
+      .update({ status: 'Idle', current_jc_id: null })
+      .eq('name', jc.stage)
+      .eq('current_jc_id', id); // only clear it if this JC was the one occupying it
+  }
+
+  if (nowAtStation) {
+    await supabase
+      .from('stations')
+      .update({ status: 'Busy', current_jc_id: id })
+      .eq('name', newStage);
+  }
 
   await supabase.from('jc_stage_history').insert({
     jc_id: id,
