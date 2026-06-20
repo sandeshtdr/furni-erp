@@ -7,7 +7,7 @@ import Badge from '../../components/Badge';
 import Button from '../../components/Button';
 import Modal from '../../components/Modal';
 import { Field, Input, Select, FormRow } from '../../components/FormFields';
-import { Search, Upload, Plus, X, Check, AlertTriangle } from 'lucide-react';
+import { Upload, Plus, X, Check, AlertTriangle } from 'lucide-react';
 
 export default function BomPage() {
   const [jcs, setJcs] = useState([]);
@@ -16,10 +16,8 @@ export default function BomPage() {
   const [loading, setLoading] = useState(true);
   const [bomLoading, setBomLoading] = useState(false);
 
-  // Searchable JC selector state
-  const [search, setSearch] = useState('');
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const searchRef = useRef(null);
+  // Connected dropdown selector state: Project ID first, then JC within that project
+  const [selectedProjectId, setSelectedProjectId] = useState('');
 
   // Manual add-row modal
   const [addOpen, setAddOpen] = useState(false);
@@ -38,7 +36,10 @@ export default function BomPage() {
     const jcData = await fetch('/api/jc').then((r) => r.json());
     const list = Array.isArray(jcData) ? jcData : [];
     setJcs(list);
-    if (list.length && !selectedJc) setSelectedJc(list[0].id);
+    if (list.length && !selectedJc) {
+      setSelectedJc(list[0].id);
+      setSelectedProjectId(list[0].project_id);
+    }
     setLoading(false);
   }
 
@@ -58,33 +59,19 @@ export default function BomPage() {
     loadBom(selectedJc);
   }, [selectedJc]);
 
-  // Close the search dropdown when clicking outside it
-  useEffect(() => {
-    function handleClick(e) {
-      if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
   const currentJc = jcs.find((j) => j.id === selectedJc);
   const allCleared = bomItems.length > 0 && bomItems.every((b) => b.inward_status === 'Inwarded');
 
-  const filteredJcs = jcs.filter((j) => {
-    const q = search.toLowerCase();
-    return (
-      j.jc_number.toLowerCase().includes(q) ||
-      j.product_name.toLowerCase().includes(q) ||
-      (j.project_id || '').toLowerCase().includes(q)
-    );
-  });
+  // Unique list of Project IDs, derived from the loaded Job Cards
+  const projectIds = [...new Set(jcs.map((j) => j.project_id))].sort();
 
-  function selectJc(jc) {
-    setSelectedJc(jc.id);
-    setSearch('');
-    setDropdownOpen(false);
+  // JCs that belong to the currently selected project
+  const jcsInProject = jcs.filter((j) => j.project_id === selectedProjectId);
+
+  function handleProjectChange(pid) {
+    setSelectedProjectId(pid);
+    const firstJcInProject = jcs.find((j) => j.project_id === pid);
+    setSelectedJc(firstJcInProject ? firstJcInProject.id : '');
   }
 
   async function addRow() {
@@ -191,39 +178,29 @@ export default function BomPage() {
       <div className="flex items-center justify-between mb-3.5 flex-wrap gap-2">
         <div className="text-[13px] font-medium">Bill of Materials</div>
 
-        {/* Searchable JC selector */}
-        <div className="relative w-80" ref={searchRef}>
-          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white">
-            <Search size={14} className="text-slate-400 flex-shrink-0" />
-            <input
-              type="text"
-              placeholder={currentJc ? `${currentJc.jc_number} — ${currentJc.product_name}` : 'Search Job Cards…'}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onFocus={() => setDropdownOpen(true)}
-              className="text-[12px] flex-1 outline-none bg-transparent"
-            />
-          </div>
-          {dropdownOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-72 overflow-y-auto scrollbar-thin z-20">
-              {filteredJcs.length === 0 && <div className="px-3 py-3 text-[12px] text-slate-400">No matching Job Cards.</div>}
-              {filteredJcs.map((j) => (
-                <button
-                  key={j.id}
-                  onClick={() => selectJc(j)}
-                  className={`w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between gap-2 ${
-                    j.id === selectedJc ? 'bg-blue-50' : ''
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <div className="text-[12px] font-medium truncate">{j.jc_number}</div>
-                    <div className="text-[11px] text-slate-500 truncate">{j.product_name}</div>
-                  </div>
-                  <Badge>{j.project_id}</Badge>
-                </button>
+        {/* Connected dropdowns: Project ID first, then JC within that project */}
+        <div className="flex items-center gap-2">
+          <div className="w-44">
+            <Select value={selectedProjectId} onChange={(e) => handleProjectChange(e.target.value)}>
+              <option value="">Select Project…</option>
+              {projectIds.map((pid) => (
+                <option key={pid} value={pid}>
+                  {pid}
+                </option>
               ))}
-            </div>
-          )}
+            </Select>
+          </div>
+          <div className="w-64">
+            <Select value={selectedJc} onChange={(e) => setSelectedJc(e.target.value)} disabled={!selectedProjectId}>
+              {!selectedProjectId && <option value="">Select a project first…</option>}
+              {selectedProjectId && jcsInProject.length === 0 && <option value="">No Job Cards in this project</option>}
+              {jcsInProject.map((j) => (
+                <option key={j.id} value={j.id}>
+                  {j.jc_number} — {j.product_name}
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
       </div>
 
