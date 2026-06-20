@@ -8,7 +8,22 @@ import Button from '../../components/Button';
 import Modal from '../../components/Modal';
 import { Field, Input, Select, FormRow } from '../../components/FormFields';
 import { Plus, ArrowRight } from 'lucide-react';
-import { JC_STAGES, stageIndex } from '../../lib/constants';
+import { STATION_SEQUENCE } from '../../lib/constants';
+
+// Display-only stage list for the Job Cards page: everything from the first
+// machine station through final dispatch is collapsed into a single
+// "Production" step. Advancing through those stages happens on the Floor
+// Tracker (and QC / Dispatch pages) instead — this page stops at Stores.
+const DISPLAY_STAGES = ['JC Created', 'BoM', 'Procurement', 'Stores', 'Production'];
+
+// Real stages that all collapse into the single "Production" display box
+const PRODUCTION_COLLAPSED_STAGES = [...STATION_SEQUENCE, 'QC', 'Packing', 'Dispatched'];
+
+function displayStageIndex(stage) {
+  if (PRODUCTION_COLLAPSED_STAGES.includes(stage)) return DISPLAY_STAGES.indexOf('Production');
+  const i = DISPLAY_STAGES.indexOf(stage);
+  return i === -1 ? 0 : i;
+}
 
 export default function JCPage() {
   const [jcs, setJcs] = useState([]);
@@ -64,7 +79,9 @@ export default function JCPage() {
       <div className="flex items-center justify-between mb-3.5 flex-wrap gap-2">
         <div>
           <div className="text-[13px] font-medium">Job Cards</div>
-          <div className="text-[11px] text-slate-500">One per product — travels with pallet</div>
+          <div className="text-[11px] text-slate-500">
+            One per product — advance through BoM / Procurement / Stores here; once on the floor, use Floor Tracker
+          </div>
         </div>
         <div className="flex gap-2">
           <select
@@ -100,7 +117,7 @@ export default function JCPage() {
             </thead>
             <tbody>
               {filtered.map((j) => {
-                const idx = stageIndex(j.stage);
+                const idx = displayStageIndex(j.stage);
                 return (
                   <tr key={j.id} className="hover:bg-slate-50">
                     <td className="px-4 py-2.5 border-b border-slate-100 font-medium whitespace-nowrap">{j.jc_number}</td>
@@ -110,7 +127,7 @@ export default function JCPage() {
                     </td>
                     <td className="px-4 py-2.5 border-b border-slate-100">
                       <div className="flex items-center gap-0.5 overflow-x-auto max-w-[420px] scrollbar-thin">
-                        {JC_STAGES.map((s, i) => (
+                        {DISPLAY_STAGES.map((s, i) => (
                           <div key={s} className="flex items-center flex-shrink-0">
                             <span
                               className={`text-[9px] px-1.5 py-0.5 rounded border whitespace-nowrap ${
@@ -123,7 +140,7 @@ export default function JCPage() {
                             >
                               {s}
                             </span>
-                            {i < JC_STAGES.length - 1 && <ArrowRight size={9} className="text-slate-300 mx-0.5" />}
+                            {i < DISPLAY_STAGES.length - 1 && <ArrowRight size={9} className="text-slate-300 mx-0.5" />}
                           </div>
                         ))}
                       </div>
@@ -132,9 +149,18 @@ export default function JCPage() {
                       <Badge status={j.status}>{j.status}</Badge>
                     </td>
                     <td className="px-4 py-2.5 border-b border-slate-100">
-                      <Button size="sm" variant="primary" onClick={() => setAdvanceTarget(j)} disabled={j.status === 'Dispatched'}>
-                        Advance <ArrowRight size={12} />
-                      </Button>
+                      {PRODUCTION_COLLAPSED_STAGES.includes(j.stage) || j.status === 'Dispatched' ? (
+                        <span
+                          className="text-[11px] text-slate-400 italic"
+                          title="Once a JC reaches the production floor, advance it from the Floor Tracker page instead."
+                        >
+                          {j.status === 'Dispatched' ? 'Dispatched' : 'Use Floor Tracker'}
+                        </span>
+                      ) : (
+                        <Button size="sm" variant="primary" onClick={() => setAdvanceTarget(j)}>
+                          Advance <ArrowRight size={12} />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 );
