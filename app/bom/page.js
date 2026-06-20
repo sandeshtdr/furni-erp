@@ -7,7 +7,8 @@ import Badge from '../../components/Badge';
 import Button from '../../components/Button';
 import Modal from '../../components/Modal';
 import { Field, Input, Select, FormRow } from '../../components/FormFields';
-import { Upload, Plus, X, Check, AlertTriangle } from 'lucide-react';
+import { Upload, Plus, X, Check, AlertTriangle, Lock } from 'lucide-react';
+import { stageIndex } from '../../lib/constants';
 
 export default function BomPage() {
   const [jcs, setJcs] = useState([]);
@@ -61,6 +62,9 @@ export default function BomPage() {
 
   const currentJc = jcs.find((j) => j.id === selectedJc);
   const allCleared = bomItems.length > 0 && bomItems.every((b) => b.inward_status === 'Inwarded');
+  // BoM can only be edited while the JC is still at the BoM stage; once it moves
+  // to Procurement (or beyond), the materials list is locked from further edits.
+  const bomLocked = currentJc ? stageIndex(currentJc.stage) > stageIndex('BoM') : false;
 
   // Unique list of Project IDs, derived from the loaded Job Cards
   const projectIds = [...new Set(jcs.map((j) => j.project_id))].sort();
@@ -75,7 +79,7 @@ export default function BomPage() {
   }
 
   async function addRow() {
-    if (!addForm.material_name || !addForm.quantity || !selectedJc) return;
+    if (!addForm.material_name || !addForm.quantity || !selectedJc || bomLocked) return;
     setSaving(true);
     await fetch('/api/bom', {
       method: 'POST',
@@ -144,7 +148,7 @@ export default function BomPage() {
   }
 
   async function confirmImport() {
-    if (!selectedJc || csvRows.length === 0 || csvError) return;
+    if (!selectedJc || csvRows.length === 0 || csvError || bomLocked) return;
     setImporting(true);
     for (const row of csvRows) {
       await fetch('/api/bom', {
@@ -211,10 +215,15 @@ export default function BomPage() {
           action={
             <div className="flex items-center gap-2">
               <Badge status={allCleared ? 'Inwarded' : 'Pending'}>{allCleared ? 'Engineer Approved' : 'Awaiting Materials'}</Badge>
-              <Button size="sm" onClick={() => setCsvOpen(true)}>
+              {bomLocked && (
+                <span className="flex items-center gap-1 text-[11px] text-slate-400 italic" title="BoM is locked once the Job Card moves past the BoM stage">
+                  <Lock size={12} /> Locked
+                </span>
+              )}
+              <Button size="sm" disabled={bomLocked} onClick={() => setCsvOpen(true)}>
                 <Upload size={13} /> Import CSV
               </Button>
-              <Button size="sm" variant="primary" onClick={() => setAddOpen(true)}>
+              <Button size="sm" variant="primary" disabled={bomLocked} onClick={() => setAddOpen(true)}>
                 <Plus size={13} /> Add Material
               </Button>
             </div>
