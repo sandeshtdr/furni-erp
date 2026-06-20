@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabaseClient';
-import { genProjectId } from '../../../lib/constants';
 
 export async function GET() {
   const { data, error } = await supabase
@@ -15,29 +14,24 @@ export async function GET() {
 export async function POST(req) {
   const body = await req.json();
 
-  // Determine next sequence number for Project ID (still purely sequential)
-  const { count } = await supabase
-    .from('manufacturing_orders')
-    .select('*', { count: 'exact', head: true });
-
-  const seq = (count || 0) + 1 + 41; // demo data starts at 042; remove +41 once demo seed is cleared
-  const project_id = genProjectId(seq);
-
-  // Build MO number from client name: MO-<first 5 letters, uppercase, letters only>-<suffix>
+  // Build the shared client code: first 5 letters of client name, uppercase, letters only
   const clientLetters = (body.client_name || '')
     .toUpperCase()
     .replace(/[^A-Z]/g, '')
     .slice(0, 5)
     .padEnd(5, 'X'); // pad short names (e.g. "Abc" -> "ABCXX") so the format stays consistent
 
-  // Count existing MOs for this same client prefix to pick the next suffix
+  // Count existing MOs for this same client code to pick the next shared suffix
   const { count: clientCount } = await supabase
     .from('manufacturing_orders')
     .select('*', { count: 'exact', head: true })
     .ilike('mo_number', `MO-${clientLetters}-%`);
 
   const suffix = String((clientCount || 0) + 1).padStart(2, '0');
+
+  // MO number and Project ID share the same client code + suffix, just different prefixes
   const mo_number = `MO-${clientLetters}-${suffix}`;
+  const project_id = `PRJ-${clientLetters}-${suffix}`;
 
   const { data, error } = await supabase
     .from('manufacturing_orders')
