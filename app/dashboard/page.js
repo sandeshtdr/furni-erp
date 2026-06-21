@@ -6,7 +6,7 @@ import Card from '../../components/Card';
 import Badge from '../../components/Badge';
 import {
   AlertTriangle, Clock, CheckCircle2, FileCheck, Truck, LockOpen, Flame, Scissors, Layers, Hammer, Puzzle,
-  ListChecks, ShoppingCart, Warehouse,
+  ListChecks, ShoppingCart, Warehouse, ClipboardCheck, Package,
 } from 'lucide-react';
 
 const STATION_ICONS = {
@@ -21,6 +21,12 @@ const PRE_FLOOR_STAGES = [
   { stage: 'BoM', label: 'Bill of Materials', icon: ListChecks },
   { stage: 'Procurement', label: 'Procurement', icon: ShoppingCart },
   { stage: 'Stores', label: 'Stores', icon: Warehouse },
+];
+
+const POST_FLOOR_STAGES = [
+  { stage: 'QC', label: 'Quality Control', icon: ClipboardCheck },
+  { stage: 'Packing', label: 'Packing', icon: Package },
+  { stage: 'Dispatched', label: 'Dispatched', icon: Truck },
 ];
 
 const EVENT_ICONS = {
@@ -220,6 +226,42 @@ export default function DashboardPage() {
                       </div>
                     ) : (
                       <Badge status="Idle">Idle</Badge>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card title="QC, packing & dispatch pipeline" subtitle="Job Cards in QC, Packing & Dispatched">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {POST_FLOOR_STAGES.map(({ stage, label, icon: Icon }) => {
+                const jcsAtStage = jcs.filter((j) => (stage === 'Dispatched' ? j.status === 'Dispatched' : j.stage === stage));
+                const hasJcs = jcsAtStage.length > 0;
+                return (
+                  <div key={stage} className={`bg-white border rounded-xl p-3 ${hasJcs ? 'border-blue-200' : 'border-slate-200'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${hasJcs ? 'bg-blue-50' : 'bg-slate-100'}`}>
+                        <Icon size={16} className={hasJcs ? 'text-blue-600' : 'text-slate-500'} />
+                      </div>
+                      <div>
+                        <div className="text-[12px] font-medium">{label}</div>
+                        <div className="text-[10px] text-slate-500">
+                          {jcsAtStage.length} JC{jcsAtStage.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    </div>
+                    {hasJcs ? (
+                      <div className="flex flex-col gap-1">
+                        {jcsAtStage.map((j) => (
+                          <div key={j.id} className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] truncate">{j.jc_number}</span>
+                            <Badge status={j.status}>{j.status}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-400">None currently</div>
                     )}
                   </div>
                 );
